@@ -1,0 +1,17 @@
+{
+  "id": "intent-routing-agent",
+  "label": "Intent Routing Agent",
+  "agentId": "pipeline-intent-classifier",
+  "description": "Classifies the analyst's question and tags it for SQL-first handling with optional document fallback.",
+  "inputs": [
+    "question",
+    "has_image"
+  ],
+  "outputs": [
+    "mode",
+    "run_vision_pipeline",
+    "reason",
+    "shelf_comparison_sql_route"
+  ],
+  "status": "scaffold"
+}
