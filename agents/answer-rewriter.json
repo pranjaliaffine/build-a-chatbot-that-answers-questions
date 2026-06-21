@@ -1,0 +1,14 @@
+{
+  "id": "answer-rewriter",
+  "label": "Answer Rewriter",
+  "agentId": "final-answer-rewriter",
+  "description": "Rewrites the consolidated answer into clear analyst-facing language while preserving facts and citations.",
+  "inputs": [
+    "original question",
+    "draft answer"
+  ],
+  "outputs": [
+    "final_answer_text"
+  ],
+  "status": "scaffold"
+}
