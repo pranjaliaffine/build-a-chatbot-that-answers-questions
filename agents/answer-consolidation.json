@@ -1,0 +1,16 @@
+{
+  "id": "answer-consolidation",
+  "label": "Answer Consolidation",
+  "agentId": "final-answer-consolidation-agent",
+  "description": "Combines database truth and document support into a single cited draft answer with conflict and partial-result notes.",
+  "inputs": [
+    "User query",
+    "intermediate JSON with count_analysis and generic_analysis"
+  ],
+  "outputs": [
+    "final_answer",
+    "reasoning",
+    "user_query"
+  ],
+  "status": "scaffold"
+}
