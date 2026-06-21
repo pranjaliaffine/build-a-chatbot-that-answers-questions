@@ -1,0 +1,1511 @@
+{
+  "sessionId": "session-1781847265122-btfb7g",
+  "title": "Build a chatbot that answers questions across structured databases and e\u2026",
+  "problemStatement": "Build a chatbot that answers questions across structured databases and enterprise documents.",
+  "exportedAt": "2026-06-21T13:16:31.984316+00:00",
+  "plan": {
+    "graph": {
+      "nodes": [
+        {
+          "id": "analyst-chat-intake",
+          "label": "Analyst Chat Intake",
+          "type": "custom",
+          "agent_id": null,
+          "description": "Receives the analyst's question and session context and forwards it into the workflow.",
+          "inputs": [
+            "Workflow entry (user request or trigger)"
+          ],
+          "outputs": [
+            "Processed result from: Workflow entry (user request or trigger)"
+          ]
+        },
+        {
+          "id": "intent-routing-agent",
+          "label": "Intent Routing Agent",
+          "type": "agent",
+          "agent_id": "pipeline-intent-classifier",
+          "description": "Classifies the analyst's question and tags it for SQL-first handling with optional document fallback.",
+          "inputs": [
+            "question",
+            "has_image"
+          ],
+          "outputs": [
+            "mode",
+            "run_vision_pipeline",
+            "reason",
+            "shelf_comparison_sql_route"
+          ]
+        },
+        {
+          "id": "nl-to-sql-execution",
+          "label": "NL to SQL Execution",
+          "type": "custom",
+          "agent_id": null,
+          "description": "Generates SQL from the question, executes it on live databases, and returns the resulting records.",
+          "inputs": [
+            "mode",
+            "run_vision_pipeline",
+            "reason",
+            "shelf_comparison_sql_route"
+          ],
+          "outputs": [
+            "Processed result from: mode",
+            "Processed result from: run_vision_pipeline",
+            "Processed result from: reason",
+            "Processed result from: shelf_comparison_sql_route"
+          ]
+        },
+        {
+          "id": "db-result-reconciliation-gateway",
+          "label": "DB Result Reconciliation Gateway",
+          "type": "gateway",
+          "agent_id": null,
+          "description": "Assesses SQL results, preserves database-first truth, and routes either directly to answering or to document support when needed.",
+          "inputs": [
+            "Processed result from: mode",
+            "Processed result from: run_vision_pipeline",
+            "Processed result from: reason",
+            "Processed result from: shelf_comparison_sql_route"
+          ],
+          "outputs": [
+            "Workflow trigger payload",
+            "Routed items to downstream steps"
+          ]
+        },
+        {
+          "id": "document-context-retrieval",
+          "label": "Document Context Retrieval",
+          "type": "agent",
+          "agent_id": "graphrag-index-query-agent",
+          "description": "Searches enterprise documents for supporting context when the SQL answer alone is not enough.",
+          "inputs": [
+            "project_id",
+            "TXT documents in projects/{id}/input/",
+            "natural language question",
+            "search method (local/global/drift/basic)"
+          ],
+          "outputs": [
+            "entities.parquet",
+            "community_reports.parquet",
+            "LanceDB embeddings",
+            "natural language answer text"
+          ]
+        },
+        {
+          "id": "semantic-rag-support",
+          "label": "Semantic RAG Support",
+          "type": "agent",
+          "agent_id": "eryl-semantic-rag-agent-chain",
+          "description": "Ranks and refines document evidence into high-quality supporting passages with citations.",
+          "inputs": [
+            "semantic_question",
+            "Vector_Data routing hints"
+          ],
+          "outputs": [
+            "retrieval-grounded answer",
+            "Semantic-based analysis_type"
+          ]
+        },
+        {
+          "id": "answer-consolidation",
+          "label": "Answer Consolidation",
+          "type": "agent",
+          "agent_id": "final-answer-consolidation-agent",
+          "description": "Combines database truth and document support into a single cited draft answer with conflict and partial-result notes.",
+          "inputs": [
+            "User query",
+            "intermediate JSON with count_analysis and generic_analysis"
+          ],
+          "outputs": [
+            "final_answer",
+            "reasoning",
+            "user_query"
+          ]
+        },
+        {
+          "id": "answer-rewriter",
+          "label": "Answer Rewriter",
+          "type": "agent",
+          "agent_id": "final-answer-rewriter",
+          "description": "Rewrites the consolidated answer into clear analyst-facing language while preserving facts and citations.",
+          "inputs": [
+            "original question",
+            "draft answer"
+          ],
+          "outputs": [
+            "final_answer_text"
+          ]
+        },
+        {
+          "id": "chat-response-delivery",
+          "label": "Chat Response Delivery",
+          "type": "custom",
+          "agent_id": null,
+          "description": "Delivers the final cited chatbot response back to the analyst.",
+          "inputs": [
+            "final_answer_text"
+          ],
+          "outputs": [
+            "Processed result from: final_answer_text"
+          ]
+        }
+      ],
+      "edges": [
+        {
+          "from_id": "analyst-chat-intake",
+          "to_id": "intent-routing-agent",
+          "label": "user question"
+        },
+        {
+          "from_id": "intent-routing-agent",
+          "to_id": "nl-to-sql-execution",
+          "label": "intent and routing metadata"
+        },
+        {
+          "from_id": "nl-to-sql-execution",
+          "to_id": "db-result-reconciliation-gateway",
+          "label": "live database results"
+        },
+        {
+          "from_id": "db-result-reconciliation-gateway",
+          "to_id": "document-context-retrieval",
+          "label": "needs explanation, ambiguity handling, or missing fields"
+        },
+        {
+          "from_id": "document-context-retrieval",
+          "to_id": "semantic-rag-support",
+          "label": "candidate document context"
+        },
+        {
+          "from_id": "semantic-rag-support",
+          "to_id": "answer-consolidation",
+          "label": "ranked supporting passages and citations"
+        },
+        {
+          "from_id": "db-result-reconciliation-gateway",
+          "to_id": "answer-consolidation",
+          "label": "database-first reconciled results and conflict status"
+        },
+        {
+          "from_id": "answer-consolidation",
+          "to_id": "answer-rewriter",
+          "label": "draft cited answer"
+        },
+        {
+          "from_id": "answer-rewriter",
+          "to_id": "chat-response-delivery",
+          "label": "final user-facing response"
+        }
+      ]
+    },
+    "reuse_decisions": [
+      {
+        "node_id": "analyst-chat-intake",
+        "node_label": "Analyst Chat Intake",
+        "decision": "build",
+        "agent_id": null,
+        "agent_name": null,
+        "rationale": "A lightweight chat entrypoint is required, and no catalog match covers the UI/session intake function.",
+        "catalog_score": 0,
+        "outputs": [
+          "Processed result from: Workflow entry (user request or trigger)"
+        ],
+        "inputs": [
+          "Workflow entry (user request or trigger)"
+        ]
+      },
+      {
+        "node_id": "intent-routing-agent",
+        "node_label": "Intent Routing Agent",
+        "decision": "adapt",
+        "agent_id": "pipeline-intent-classifier",
+        "agent_name": "Pipeline Intent Classifier",
+        "rationale": "The classifier already routes user questions and can be adapted to distinguish database-only versus database-plus-document lookup intents.",
+        "catalog_score": 0.01,
+        "inputs": [
+          "question",
+          "has_image"
+        ],
+        "outputs": [
+          "mode",
+          "run_vision_pipeline",
+          "reason",
+          "shelf_comparison_sql_route"
+        ]
+      },
+      {
+        "node_id": "nl-to-sql-execution",
+        "node_label": "NL to SQL Execution",
+        "decision": "build",
+        "agent_id": null,
+        "agent_name": null,
+        "rationale": "The requirement to generate and execute live SQL against enterprise databases is core and not directly covered by any provided catalog agent.",
+        "catalog_score": 0,
+        "outputs": [
+          "Processed result from: mode",
+          "Processed result from: run_vision_pipeline",
+          "Processed result from: reason",
+          "Processed result from: shelf_comparison_sql_route"
+        ],
+        "inputs": [
+          "mode",
+          "run_vision_pipeline",
+          "reason",
+          "shelf_comparison_sql_route"
+        ]
+      },
+      {
+        "node_id": "db-result-reconciliation-gateway",
+        "node_label": "DB Result Reconciliation Gateway",
+        "decision": "build",
+        "agent_id": null,
+        "agent_name": null,
+        "rationale": "Database-first trust enforcement, completeness scoring, and explicit conflict gating are bespoke control logic rather than a cataloged agent capability.",
+        "catalog_score": 0,
+        "outputs": [
+          "Workflow trigger payload",
+          "Routed items to downstream steps"
+        ],
+        "inputs": [
+          "Processed result from: mode",
+          "Processed result from: run_vision_pipeline",
+          "Processed result from: reason",
+          "Processed result from: shelf_comparison_sql_route"
+        ]
+      },
+      {
+        "node_id": "document-context-retrieval",
+        "node_label": "Document Context Retrieval",
+        "decision": "adapt",
+        "agent_id": "graphrag-index-query-agent",
+        "agent_name": "GraphRAG Index & Query Agent",
+        "rationale": "This agent aligns with indexing and querying enterprise documents and can be adapted from project/KYC content to general enterprise repositories.",
+        "catalog_score": 0.03,
+        "inputs": [
+          "project_id",
+          "TXT documents in projects/{id}/input/",
+          "natural language question",
+          "search method (local/global/drift/basic)"
+        ],
+        "outputs": [
+          "entities.parquet",
+          "community_reports.parquet",
+          "LanceDB embeddings",
+          "natural language answer text"
+        ]
+      },
+      {
+        "node_id": "semantic-rag-support",
+        "node_label": "Semantic RAG Support",
+        "decision": "adapt",
+        "agent_id": "eryl-semantic-rag-agent-chain",
+        "agent_name": "Eryl Semantic RAG Agent Chain",
+        "rationale": "Although domain-specific today, it is a close fit for semantic retrieval and answer support over unstructured documents.",
+        "catalog_score": 0.03,
+        "inputs": [
+          "semantic_question",
+          "Vector_Data routing hints"
+        ],
+        "outputs": [
+          "retrieval-grounded answer",
+          "Semantic-based analysis_type"
+        ]
+      },
+      {
+        "node_id": "answer-consolidation",
+        "node_label": "Answer Consolidation",
+        "decision": "adapt",
+        "agent_id": "final-answer-consolidation-agent",
+        "agent_name": "Final Answer Consolidation Agent",
+        "rationale": "The agent already consolidates multiple analytical outputs into one response and can be adapted to merge SQL truth with document evidence and citations.",
+        "catalog_score": 0.03,
+        "inputs": [
+          "User query",
+          "intermediate JSON with count_analysis and generic_analysis"
+        ],
+        "outputs": [
+          "final_answer",
+          "reasoning",
+          "user_query"
+        ]
+      },
+      {
+        "node_id": "answer-rewriter",
+        "node_label": "Answer Rewriter",
+        "decision": "reuse",
+        "agent_id": "final-answer-rewriter",
+        "agent_name": "Final Answer Rewriter",
+        "rationale": "This is a direct fit for converting a combined draft answer into concise user-facing text without introducing new facts.",
+        "catalog_score": 0.03,
+        "inputs": [
+          "original question",
+          "draft answer"
+        ],
+        "outputs": [
+          "final_answer_text"
+        ]
+      },
+      {
+        "node_id": "chat-response-delivery",
+        "node_label": "Chat Response Delivery",
+        "decision": "build",
+        "agent_id": null,
+        "agent_name": null,
+        "rationale": "Final response delivery into the chatbot channel is an application integration concern not represented in the catalog.",
+        "catalog_score": 0,
+        "outputs": [
+          "Processed result from: final_answer_text"
+        ],
+        "inputs": [
+          "final_answer_text"
+        ]
+      }
+    ],
+    "catalog_matches": [
+      {
+        "agent_id": "eryl-semantic-rag-agent-chain",
+        "name": "Eryl Semantic RAG Agent Chain",
+        "category": "Document & Data",
+        "origin_client": "Mars",
+        "origin_project": "Mars Sales Genie (Copilot) / Unified View",
+        "function_summary": "Retrieves and answers from indexed retail policy and unstructured documents (Chocolate_Confectionery_Retail_Policy.docx, emails, guidelines) using Azure AI Search vector + semantic retrieval.",
+        "score": 0.03333333507180214,
+        "matched_for": "Build a chatbot that answers questions across structured databases and enterpris"
+      },
+      {
+        "agent_id": "final-answer-consolidation-agent",
+        "name": "Final Answer Consolidation Agent",
+        "category": "Sales & Revenue",
+        "origin_client": "Affine Analytics",
+        "origin_project": "Merchandising Vision Agent",
+        "function_summary": "Consolidates count and generic row-level analyses into a single natural-language answer based on task_type routing.",
+        "score": 0.032522473484277725,
+        "matched_for": "Analyst submits natural language lookup question, Intent router classifies wheth"
+      },
+      {
+        "agent_id": "graphrag-index-query-pipeline",
+        "name": "GraphRAG Index & Query Pipeline",
+        "category": "Document & Data",
+        "origin_client": "JPMorgan Chase (JPMC)",
+        "origin_project": "JPMC KYC Risk Pre-Screening (UBO GraphRAG)",
+        "function_summary": "Converts project documents to text, indexes a per-project knowledge graph with entities, communities, and embeddings, and answers analyst questions. It takes project documents plus a query string and search method as input and returns index artifacts and natural-language answers.",
+        "score": 0.03226646035909653,
+        "matched_for": "Analyst submits natural language lookup question, Intent router classifies wheth"
+      },
+      {
+        "agent_id": "graphrag-index-query-agent",
+        "name": "GraphRAG Index & Query Agent",
+        "category": "Document & Data",
+        "origin_client": "JPMorgan Chase (JPMC)",
+        "origin_project": "JPMC KYC Risk Pre-Screening (UBO GraphRAG)",
+        "function_summary": "Indexes per-project KYC documents into a knowledge graph with entity/community extraction and embeddings; answers analyst questions via local, global, drift, or basic search methods.",
+        "score": 0.03177805617451668,
+        "matched_for": "Provide internal analysts with a chatbot for record lookups that answers primari"
+      },
+      {
+        "agent_id": "final-answer-rewriter",
+        "name": "Final Answer Rewriter",
+        "category": "Document & Data",
+        "origin_client": "Mars",
+        "origin_project": "Mars Sales Genie (Copilot) / Unified View",
+        "function_summary": "Post-processes combined vision+SQL+semantic draft answers into concise structured user-facing text without adding new facts.",
+        "score": 0.03177805617451668,
+        "matched_for": "Build a chatbot that answers questions across structured databases and enterpris"
+      },
+      {
+        "agent_id": "entity-extraction-agent",
+        "name": "Entity Extraction Agent",
+        "category": "Document & Data",
+        "origin_client": "JPMorgan Chase (JPMC)",
+        "origin_project": "JPMC KYC Risk Pre-Screening (UBO GraphRAG)",
+        "function_summary": "Extracts entities, ownership relationships, and UBO registry records from uploaded corporate KYC documents into structured JSON for SQL persistence.",
+        "score": 0.014705882407724857,
+        "matched_for": "Provide internal analysts with a chatbot for record lookups that answers primari"
+      },
+      {
+        "agent_id": "pipeline-intent-classifier",
+        "name": "Pipeline Intent Classifier",
+        "category": "Document & Data",
+        "origin_client": "Mars",
+        "origin_project": "Mars Sales Genie (Copilot) / Unified View",
+        "function_summary": "Classifies each user question into vision_only, vision_then_unified, or unified_only and flags multi-shelf comparisons for SQL-only routing.",
+        "score": 0.01315789483487606,
+        "matched_for": "Analyst submits natural language lookup question, Intent router classifies wheth"
+      },
+      {
+        "agent_id": "azure-ai-vision-catalog-embedder",
+        "name": "Azure AI Vision Catalog Embedder",
+        "category": "Document & Data",
+        "origin_client": "Affine Analytics",
+        "origin_project": "Affine Analytics VTO Platform",
+        "function_summary": "Generates 1024-dimensional multimodal embeddings for catalog accessory images and natural-language search queries to power semantic garment discovery.",
+        "score": 0.01149425283074379,
+        "matched_for": "Analyst submits natural language lookup question, Intent router classifies wheth"
+      },
+      {
+        "agent_id": "planogram-vision-llm-suite",
+        "name": "Planogram Vision LLM Suite",
+        "category": "Quality & Compliance",
+        "origin_client": "Mars",
+        "origin_project": "Mars Sales Genie (Copilot) / Unified View",
+        "function_summary": "Azure OpenAI vision functions for shelf-level product extraction, row counting, generic row description, daily KPI JSON, and final natural-language shelf answers after Roboflow cropping.",
+        "score": 0.01123595517128706,
+        "matched_for": "Provide internal analysts with a chatbot for record lookups that answers primari"
+      }
+    ],
+    "summary_markdown": "This architecture implements a database-first analyst chatbot over live structured enterprise databases and enterprise document repositories. The main path starts with chat intake, routes the question through an intent classifier, executes live SQL against source systems, and then applies a reconciliation gateway that enforces the trust hierarchy: database results remain authoritative, partial answers are allowed, and conflicts are surfaced explicitly rather than silently resolved.\n\nWhen the reconciliation step detects ambiguity, missing fields, or a need for narrative/policy explanation, the flow branches forward into document retrieval using adapted catalog agents. GraphRAG Index & Query Agent provides enterprise document search, while Eryl Semantic RAG Agent Chain adds semantic support retrieval. Their outputs feed a consolidation step that merges database evidence and document context into a cited draft answer, followed by Final Answer Rewriter for concise analyst-facing wording, and then delivery back to the chat interface. No human-in-the-loop gate is included because the spec explicitly states no mandatory human review in the main flow.\n\nReuse is catalog-first: 5 of 9 nodes are reuse/adapt decisions, including intent routing, document retrieval, semantic retrieval, answer consolidation, and final rewriting. Build is reserved for capabilities not represented in the provided catalog: chat intake/delivery, live NL-to-SQL execution against enterprise databases, and the database-first reconciliation gateway. This keeps custom work focused on the highest-risk integration and governance logic while maximizing leverage of proven Affine agents.\n\nKey risks are the absence of a direct catalog match for live NL-to-SQL, the need to adapt document agents from their current domains to general enterprise repositories, and ensuring orchestration preserves database-first behavior under partial or conflicting evidence. The orchestration model should therefore be a deterministic staged pipeline with explicit routing and gating between SQL retrieval, reconciliation, document augmentation, and answer composition.",
+    "open_questions": [
+      "Which database platforms and schemas must the NL-to-SQL component support?",
+      "Are enterprise documents already indexed, or must GraphRAG/Semantic RAG indexing be added as a prerequisite ingestion workflow?",
+      "What citation granularity is required for database answers versus document passages?",
+      "Should conflict flags include confidence scores or only qualitative explanations?"
+    ],
+    "validation": {
+      "overall": "warn",
+      "pass_count": 14,
+      "warn_count": 10,
+      "fail_count": 0,
+      "structural_fail_count": 0,
+      "unresolved_actionable_count": 10,
+      "can_approve": false,
+      "approval_hint": "10 issue(s) still need a fix or review.",
+      "items": [
+        {
+          "level": "pass",
+          "code": "has_nodes",
+          "message": "Graph has 9 components and 9 connections.",
+          "node_id": null,
+          "finding_id": "has_nodes:_",
+          "finding_key": "has_nodes:_",
+          "blocks_approval": false,
+          "help_text": "",
+          "remediations": [],
+          "resolved": false,
+          "resolution": null
+        },
+        {
+          "level": "pass",
+          "code": "build_ok",
+          "message": "Custom build for 'Analyst Chat Intake' \u2014 confirm no catalog alternative.",
+          "node_id": "analyst-chat-intake",
+          "finding_id": "build_ok:analyst-chat-intake",
+          "finding_key": "build_ok:analyst-chat-intake",
+          "blocks_approval": false,
+          "help_text": "",
+          "remediations": [],
+          "resolved": false,
+          "resolution": null
+        },
+        {
+          "level": "warn",
+          "code": "low_catalog_score",
+          "message": "Catalog match score is low (0.01) for 'Pipeline Intent Classifier'.",
+          "node_id": "intent-routing-agent",
+          "finding_id": "low_catalog_score:intent-routing-agent",
+          "finding_key": "low_catalog_score:intent-routing-agent",
+          "blocks_approval": false,
+          "help_text": "",
+          "remediations": [
+            {
+              "id": "switch_catalog_final-answer-consolidation-agent",
+              "label": "Try: Final Answer Consolidation Agent",
+              "description": "Switch to alternate catalog agent (score 0.03).",
+              "finding_id": "low_catalog_score:intent-routing-agent",
+              "action": "set_decision",
+              "node_id": "intent-routing-agent",
+              "decision": "reuse",
+              "agent_id": "final-answer-consolidation-agent",
+              "agent_name": "Final Answer Consolidation Agent",
+              "catalog_score": 0.032522473484277725,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            },
+            {
+              "id": "switch_catalog_graphrag-index-query-pipeline",
+              "label": "Try: GraphRAG Index & Query Pipeline",
+              "description": "Switch to alternate catalog agent (score 0.03).",
+              "finding_id": "low_catalog_score:intent-routing-agent",
+              "action": "set_decision",
+              "node_id": "intent-routing-agent",
+              "decision": "reuse",
+              "agent_id": "graphrag-index-query-pipeline",
+              "agent_name": "GraphRAG Index & Query Pipeline",
+              "catalog_score": 0.03226646035909653,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            },
+            {
+              "id": "switch_catalog_graphrag-index-query-agent",
+              "label": "Try: GraphRAG Index & Query Agent",
+              "description": "Switch to alternate catalog agent (score 0.03).",
+              "finding_id": "low_catalog_score:intent-routing-agent",
+              "action": "set_decision",
+              "node_id": "intent-routing-agent",
+              "decision": "reuse",
+              "agent_id": "graphrag-index-query-agent",
+              "agent_name": "GraphRAG Index & Query Agent",
+              "catalog_score": 0.03177805617451668,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            },
+            {
+              "id": "mark_build",
+              "label": "Build custom instead",
+              "description": "Drop catalog reuse for this step.",
+              "finding_id": "low_catalog_score:intent-routing-agent",
+              "action": "set_decision",
+              "node_id": "intent-routing-agent",
+              "decision": "build",
+              "agent_id": null,
+              "agent_name": null,
+              "catalog_score": null,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            },
+            {
+              "id": "acknowledge_fit",
+              "label": "Accept current match",
+              "description": "Keep assignment; you reviewed fit manually.",
+              "finding_id": "low_catalog_score:intent-routing-agent",
+              "action": "acknowledge",
+              "node_id": null,
+              "decision": null,
+              "agent_id": null,
+              "agent_name": null,
+              "catalog_score": null,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            }
+          ],
+          "resolved": false,
+          "resolution": null
+        },
+        {
+          "level": "pass",
+          "code": "catalog_fit",
+          "message": "Catalog agent 'Pipeline Intent Classifier' aligns with this step.",
+          "node_id": "intent-routing-agent",
+          "finding_id": "catalog_fit:intent-routing-agent",
+          "finding_key": "catalog_fit:intent-routing-agent",
+          "blocks_approval": false,
+          "help_text": "",
+          "remediations": [],
+          "resolved": false,
+          "resolution": null
+        },
+        {
+          "level": "pass",
+          "code": "build_ok",
+          "message": "Custom build for 'NL to SQL Execution' \u2014 confirm no catalog alternative.",
+          "node_id": "nl-to-sql-execution",
+          "finding_id": "build_ok:nl-to-sql-execution",
+          "finding_key": "build_ok:nl-to-sql-execution",
+          "blocks_approval": false,
+          "help_text": "",
+          "remediations": [],
+          "resolved": false,
+          "resolution": null
+        },
+        {
+          "level": "pass",
+          "code": "build_ok",
+          "message": "Custom build for 'DB Result Reconciliation Gateway' \u2014 confirm no catalog alternative.",
+          "node_id": "db-result-reconciliation-gateway",
+          "finding_id": "build_ok:db-result-reconciliation-gateway",
+          "finding_key": "build_ok:db-result-reconciliation-gateway",
+          "blocks_approval": false,
+          "help_text": "",
+          "remediations": [],
+          "resolved": false,
+          "resolution": null
+        },
+        {
+          "level": "warn",
+          "code": "low_catalog_score",
+          "message": "Catalog match score is low (0.03) for 'GraphRAG Index & Query Agent'.",
+          "node_id": "document-context-retrieval",
+          "finding_id": "low_catalog_score:document-context-retrieval",
+          "finding_key": "low_catalog_score:document-context-retrieval",
+          "blocks_approval": false,
+          "help_text": "",
+          "remediations": [
+            {
+              "id": "switch_catalog_final-answer-consolidation-agent",
+              "label": "Try: Final Answer Consolidation Agent",
+              "description": "Switch to alternate catalog agent (score 0.03).",
+              "finding_id": "low_catalog_score:document-context-retrieval",
+              "action": "set_decision",
+              "node_id": "document-context-retrieval",
+              "decision": "reuse",
+              "agent_id": "final-answer-consolidation-agent",
+              "agent_name": "Final Answer Consolidation Agent",
+              "catalog_score": 0.032522473484277725,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            },
+            {
+              "id": "switch_catalog_graphrag-index-query-pipeline",
+              "label": "Try: GraphRAG Index & Query Pipeline",
+              "description": "Switch to alternate catalog agent (score 0.03).",
+              "finding_id": "low_catalog_score:document-context-retrieval",
+              "action": "set_decision",
+              "node_id": "document-context-retrieval",
+              "decision": "reuse",
+              "agent_id": "graphrag-index-query-pipeline",
+              "agent_name": "GraphRAG Index & Query Pipeline",
+              "catalog_score": 0.03226646035909653,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            },
+            {
+              "id": "switch_catalog_graphrag-index-query-agent",
+              "label": "Try: GraphRAG Index & Query Agent",
+              "description": "Switch to alternate catalog agent (score 0.03).",
+              "finding_id": "low_catalog_score:document-context-retrieval",
+              "action": "set_decision",
+              "node_id": "document-context-retrieval",
+              "decision": "reuse",
+              "agent_id": "graphrag-index-query-agent",
+              "agent_name": "GraphRAG Index & Query Agent",
+              "catalog_score": 0.03177805617451668,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            },
+            {
+              "id": "mark_build",
+              "label": "Build custom instead",
+              "description": "Drop catalog reuse for this step.",
+              "finding_id": "low_catalog_score:document-context-retrieval",
+              "action": "set_decision",
+              "node_id": "document-context-retrieval",
+              "decision": "build",
+              "agent_id": null,
+              "agent_name": null,
+              "catalog_score": null,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            },
+            {
+              "id": "acknowledge_fit",
+              "label": "Accept current match",
+              "description": "Keep assignment; you reviewed fit manually.",
+              "finding_id": "low_catalog_score:document-context-retrieval",
+              "action": "acknowledge",
+              "node_id": null,
+              "decision": null,
+              "agent_id": null,
+              "agent_name": null,
+              "catalog_score": null,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            }
+          ],
+          "resolved": false,
+          "resolution": null
+        },
+        {
+          "level": "pass",
+          "code": "catalog_fit",
+          "message": "Catalog agent 'GraphRAG Index & Query Agent' aligns with this step.",
+          "node_id": "document-context-retrieval",
+          "finding_id": "catalog_fit:document-context-retrieval",
+          "finding_key": "catalog_fit:document-context-retrieval",
+          "blocks_approval": false,
+          "help_text": "",
+          "remediations": [],
+          "resolved": false,
+          "resolution": null
+        },
+        {
+          "level": "warn",
+          "code": "low_catalog_score",
+          "message": "Catalog match score is low (0.03) for 'Eryl Semantic RAG Agent Chain'.",
+          "node_id": "semantic-rag-support",
+          "finding_id": "low_catalog_score:semantic-rag-support",
+          "finding_key": "low_catalog_score:semantic-rag-support",
+          "blocks_approval": false,
+          "help_text": "",
+          "remediations": [
+            {
+              "id": "switch_catalog_final-answer-consolidation-agent",
+              "label": "Try: Final Answer Consolidation Agent",
+              "description": "Switch to alternate catalog agent (score 0.03).",
+              "finding_id": "low_catalog_score:semantic-rag-support",
+              "action": "set_decision",
+              "node_id": "semantic-rag-support",
+              "decision": "reuse",
+              "agent_id": "final-answer-consolidation-agent",
+              "agent_name": "Final Answer Consolidation Agent",
+              "catalog_score": 0.032522473484277725,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            },
+            {
+              "id": "switch_catalog_graphrag-index-query-pipeline",
+              "label": "Try: GraphRAG Index & Query Pipeline",
+              "description": "Switch to alternate catalog agent (score 0.03).",
+              "finding_id": "low_catalog_score:semantic-rag-support",
+              "action": "set_decision",
+              "node_id": "semantic-rag-support",
+              "decision": "reuse",
+              "agent_id": "graphrag-index-query-pipeline",
+              "agent_name": "GraphRAG Index & Query Pipeline",
+              "catalog_score": 0.03226646035909653,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            },
+            {
+              "id": "switch_catalog_graphrag-index-query-agent",
+              "label": "Try: GraphRAG Index & Query Agent",
+              "description": "Switch to alternate catalog agent (score 0.03).",
+              "finding_id": "low_catalog_score:semantic-rag-support",
+              "action": "set_decision",
+              "node_id": "semantic-rag-support",
+              "decision": "reuse",
+              "agent_id": "graphrag-index-query-agent",
+              "agent_name": "GraphRAG Index & Query Agent",
+              "catalog_score": 0.03177805617451668,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            },
+            {
+              "id": "mark_build",
+              "label": "Build custom instead",
+              "description": "Drop catalog reuse for this step.",
+              "finding_id": "low_catalog_score:semantic-rag-support",
+              "action": "set_decision",
+              "node_id": "semantic-rag-support",
+              "decision": "build",
+              "agent_id": null,
+              "agent_name": null,
+              "catalog_score": null,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            },
+            {
+              "id": "acknowledge_fit",
+              "label": "Accept current match",
+              "description": "Keep assignment; you reviewed fit manually.",
+              "finding_id": "low_catalog_score:semantic-rag-support",
+              "action": "acknowledge",
+              "node_id": null,
+              "decision": null,
+              "agent_id": null,
+              "agent_name": null,
+              "catalog_score": null,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            }
+          ],
+          "resolved": false,
+          "resolution": null
+        },
+        {
+          "level": "pass",
+          "code": "catalog_fit",
+          "message": "Catalog agent 'Eryl Semantic RAG Agent Chain' aligns with this step.",
+          "node_id": "semantic-rag-support",
+          "finding_id": "catalog_fit:semantic-rag-support",
+          "finding_key": "catalog_fit:semantic-rag-support",
+          "blocks_approval": false,
+          "help_text": "",
+          "remediations": [],
+          "resolved": false,
+          "resolution": null
+        },
+        {
+          "level": "warn",
+          "code": "low_catalog_score",
+          "message": "Catalog match score is low (0.03) for 'Final Answer Consolidation Agent'.",
+          "node_id": "answer-consolidation",
+          "finding_id": "low_catalog_score:answer-consolidation",
+          "finding_key": "low_catalog_score:answer-consolidation",
+          "blocks_approval": false,
+          "help_text": "",
+          "remediations": [
+            {
+              "id": "switch_catalog_final-answer-consolidation-agent",
+              "label": "Try: Final Answer Consolidation Agent",
+              "description": "Switch to alternate catalog agent (score 0.03).",
+              "finding_id": "low_catalog_score:answer-consolidation",
+              "action": "set_decision",
+              "node_id": "answer-consolidation",
+              "decision": "reuse",
+              "agent_id": "final-answer-consolidation-agent",
+              "agent_name": "Final Answer Consolidation Agent",
+              "catalog_score": 0.032522473484277725,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            },
+            {
+              "id": "switch_catalog_graphrag-index-query-pipeline",
+              "label": "Try: GraphRAG Index & Query Pipeline",
+              "description": "Switch to alternate catalog agent (score 0.03).",
+              "finding_id": "low_catalog_score:answer-consolidation",
+              "action": "set_decision",
+              "node_id": "answer-consolidation",
+              "decision": "reuse",
+              "agent_id": "graphrag-index-query-pipeline",
+              "agent_name": "GraphRAG Index & Query Pipeline",
+              "catalog_score": 0.03226646035909653,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            },
+            {
+              "id": "switch_catalog_graphrag-index-query-agent",
+              "label": "Try: GraphRAG Index & Query Agent",
+              "description": "Switch to alternate catalog agent (score 0.03).",
+              "finding_id": "low_catalog_score:answer-consolidation",
+              "action": "set_decision",
+              "node_id": "answer-consolidation",
+              "decision": "reuse",
+              "agent_id": "graphrag-index-query-agent",
+              "agent_name": "GraphRAG Index & Query Agent",
+              "catalog_score": 0.03177805617451668,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            },
+            {
+              "id": "mark_build",
+              "label": "Build custom instead",
+              "description": "Drop catalog reuse for this step.",
+              "finding_id": "low_catalog_score:answer-consolidation",
+              "action": "set_decision",
+              "node_id": "answer-consolidation",
+              "decision": "build",
+              "agent_id": null,
+              "agent_name": null,
+              "catalog_score": null,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            },
+            {
+              "id": "acknowledge_fit",
+              "label": "Accept current match",
+              "description": "Keep assignment; you reviewed fit manually.",
+              "finding_id": "low_catalog_score:answer-consolidation",
+              "action": "acknowledge",
+              "node_id": null,
+              "decision": null,
+              "agent_id": null,
+              "agent_name": null,
+              "catalog_score": null,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            }
+          ],
+          "resolved": false,
+          "resolution": null
+        },
+        {
+          "level": "pass",
+          "code": "catalog_fit",
+          "message": "Catalog agent 'Final Answer Consolidation Agent' aligns with this step.",
+          "node_id": "answer-consolidation",
+          "finding_id": "catalog_fit:answer-consolidation",
+          "finding_key": "catalog_fit:answer-consolidation",
+          "blocks_approval": false,
+          "help_text": "",
+          "remediations": [],
+          "resolved": false,
+          "resolution": null
+        },
+        {
+          "level": "warn",
+          "code": "low_catalog_score",
+          "message": "Catalog match score is low (0.03) for 'Final Answer Rewriter'.",
+          "node_id": "answer-rewriter",
+          "finding_id": "low_catalog_score:answer-rewriter",
+          "finding_key": "low_catalog_score:answer-rewriter",
+          "blocks_approval": false,
+          "help_text": "",
+          "remediations": [
+            {
+              "id": "switch_catalog_final-answer-consolidation-agent",
+              "label": "Try: Final Answer Consolidation Agent",
+              "description": "Switch to alternate catalog agent (score 0.03).",
+              "finding_id": "low_catalog_score:answer-rewriter",
+              "action": "set_decision",
+              "node_id": "answer-rewriter",
+              "decision": "reuse",
+              "agent_id": "final-answer-consolidation-agent",
+              "agent_name": "Final Answer Consolidation Agent",
+              "catalog_score": 0.032522473484277725,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            },
+            {
+              "id": "switch_catalog_graphrag-index-query-pipeline",
+              "label": "Try: GraphRAG Index & Query Pipeline",
+              "description": "Switch to alternate catalog agent (score 0.03).",
+              "finding_id": "low_catalog_score:answer-rewriter",
+              "action": "set_decision",
+              "node_id": "answer-rewriter",
+              "decision": "reuse",
+              "agent_id": "graphrag-index-query-pipeline",
+              "agent_name": "GraphRAG Index & Query Pipeline",
+              "catalog_score": 0.03226646035909653,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            },
+            {
+              "id": "switch_catalog_graphrag-index-query-agent",
+              "label": "Try: GraphRAG Index & Query Agent",
+              "description": "Switch to alternate catalog agent (score 0.03).",
+              "finding_id": "low_catalog_score:answer-rewriter",
+              "action": "set_decision",
+              "node_id": "answer-rewriter",
+              "decision": "reuse",
+              "agent_id": "graphrag-index-query-agent",
+              "agent_name": "GraphRAG Index & Query Agent",
+              "catalog_score": 0.03177805617451668,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            },
+            {
+              "id": "mark_build",
+              "label": "Build custom instead",
+              "description": "Drop catalog reuse for this step.",
+              "finding_id": "low_catalog_score:answer-rewriter",
+              "action": "set_decision",
+              "node_id": "answer-rewriter",
+              "decision": "build",
+              "agent_id": null,
+              "agent_name": null,
+              "catalog_score": null,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            },
+            {
+              "id": "acknowledge_fit",
+              "label": "Accept current match",
+              "description": "Keep assignment; you reviewed fit manually.",
+              "finding_id": "low_catalog_score:answer-rewriter",
+              "action": "acknowledge",
+              "node_id": null,
+              "decision": null,
+              "agent_id": null,
+              "agent_name": null,
+              "catalog_score": null,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            }
+          ],
+          "resolved": false,
+          "resolution": null
+        },
+        {
+          "level": "pass",
+          "code": "catalog_fit",
+          "message": "Catalog agent 'Final Answer Rewriter' aligns with this step.",
+          "node_id": "answer-rewriter",
+          "finding_id": "catalog_fit:answer-rewriter",
+          "finding_key": "catalog_fit:answer-rewriter",
+          "blocks_approval": false,
+          "help_text": "",
+          "remediations": [],
+          "resolved": false,
+          "resolution": null
+        },
+        {
+          "level": "pass",
+          "code": "build_ok",
+          "message": "Custom build for 'Chat Response Delivery' \u2014 confirm no catalog alternative.",
+          "node_id": "chat-response-delivery",
+          "finding_id": "build_ok:chat-response-delivery",
+          "finding_key": "build_ok:chat-response-delivery",
+          "blocks_approval": false,
+          "help_text": "",
+          "remediations": [],
+          "resolved": false,
+          "resolution": null
+        },
+        {
+          "level": "warn",
+          "code": "hitl_missing",
+          "message": "Spec requires human-in-the-loop but no 'human' step appears on the graph.",
+          "node_id": null,
+          "finding_id": "hitl_missing:_",
+          "finding_key": "hitl_missing:_",
+          "blocks_approval": false,
+          "help_text": "Add a human approval step or acknowledge HITL is external.",
+          "remediations": [
+            {
+              "id": "add_human_step",
+              "label": "Add human approval step",
+              "description": "Insert an analyst review node into the flow.",
+              "finding_id": "hitl_missing:_",
+              "action": "add_human_node",
+              "node_id": null,
+              "decision": null,
+              "agent_id": null,
+              "agent_name": null,
+              "catalog_score": null,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            },
+            {
+              "id": "acknowledge_hitl",
+              "label": "HITL handled outside diagram",
+              "description": "Human review happens in another system.",
+              "finding_id": "hitl_missing:_",
+              "action": "acknowledge",
+              "node_id": null,
+              "decision": null,
+              "agent_id": null,
+              "agent_name": null,
+              "catalog_score": null,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            }
+          ],
+          "resolved": false,
+          "resolution": null
+        },
+        {
+          "level": "pass",
+          "code": "integrations_reflected",
+          "message": "Key integrations from spec appear in the architecture.",
+          "node_id": null,
+          "finding_id": "integrations_reflected:_",
+          "finding_key": "integrations_reflected:_",
+          "blocks_approval": false,
+          "help_text": "",
+          "remediations": [],
+          "resolved": false,
+          "resolution": null
+        },
+        {
+          "level": "pass",
+          "code": "use_case_aligned",
+          "message": "Architecture text overlaps with stated use case.",
+          "node_id": null,
+          "finding_id": "use_case_aligned:_",
+          "finding_key": "use_case_aligned:_",
+          "blocks_approval": false,
+          "help_text": "",
+          "remediations": [],
+          "resolved": false,
+          "resolution": null
+        },
+        {
+          "level": "pass",
+          "code": "flow_documented",
+          "message": "Architectural flow was confirmed in the interview \u2014 compare visually to canvas.",
+          "node_id": null,
+          "finding_id": "flow_documented:_",
+          "finding_key": "flow_documented:_",
+          "blocks_approval": false,
+          "help_text": "Validation checks structure and spec overlap, not full business correctness.",
+          "remediations": [],
+          "resolved": false,
+          "resolution": null
+        },
+        {
+          "level": "warn",
+          "code": "open_question",
+          "message": "Which database platforms and schemas must the NL-to-SQL component support?",
+          "node_id": null,
+          "finding_id": "open_question:0",
+          "finding_key": "open_question:0",
+          "blocks_approval": false,
+          "help_text": "Resolve or acknowledge open planning questions.",
+          "remediations": [
+            {
+              "id": "resolve_question",
+              "label": "Mark question resolved",
+              "description": "Remove this open question from the plan.",
+              "finding_id": "open_question:0",
+              "action": "remove_open_question",
+              "node_id": null,
+              "decision": null,
+              "agent_id": null,
+              "agent_name": null,
+              "catalog_score": null,
+              "gateway_label": null,
+              "question_text": "Which database platforms and schemas must the NL-to-SQL component support?",
+              "edge_from": null,
+              "edge_to": null
+            },
+            {
+              "id": "keep_question",
+              "label": "Keep tracking this question",
+              "description": "Leave open; acknowledge you are aware.",
+              "finding_id": "open_question:0",
+              "action": "acknowledge",
+              "node_id": null,
+              "decision": null,
+              "agent_id": null,
+              "agent_name": null,
+              "catalog_score": null,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            }
+          ],
+          "resolved": false,
+          "resolution": null
+        },
+        {
+          "level": "warn",
+          "code": "open_question",
+          "message": "Are enterprise documents already indexed, or must GraphRAG/Semantic RAG indexing be added as a prerequisite ingestion workflow?",
+          "node_id": null,
+          "finding_id": "open_question:1",
+          "finding_key": "open_question:1",
+          "blocks_approval": false,
+          "help_text": "Resolve or acknowledge open planning questions.",
+          "remediations": [
+            {
+              "id": "resolve_question",
+              "label": "Mark question resolved",
+              "description": "Remove this open question from the plan.",
+              "finding_id": "open_question:1",
+              "action": "remove_open_question",
+              "node_id": null,
+              "decision": null,
+              "agent_id": null,
+              "agent_name": null,
+              "catalog_score": null,
+              "gateway_label": null,
+              "question_text": "Are enterprise documents already indexed, or must GraphRAG/Semantic RAG indexing be added as a prerequisite ingestion workflow?",
+              "edge_from": null,
+              "edge_to": null
+            },
+            {
+              "id": "keep_question",
+              "label": "Keep tracking this question",
+              "description": "Leave open; acknowledge you are aware.",
+              "finding_id": "open_question:1",
+              "action": "acknowledge",
+              "node_id": null,
+              "decision": null,
+              "agent_id": null,
+              "agent_name": null,
+              "catalog_score": null,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            }
+          ],
+          "resolved": false,
+          "resolution": null
+        },
+        {
+          "level": "warn",
+          "code": "open_question",
+          "message": "What citation granularity is required for database answers versus document passages?",
+          "node_id": null,
+          "finding_id": "open_question:2",
+          "finding_key": "open_question:2",
+          "blocks_approval": false,
+          "help_text": "Resolve or acknowledge open planning questions.",
+          "remediations": [
+            {
+              "id": "resolve_question",
+              "label": "Mark question resolved",
+              "description": "Remove this open question from the plan.",
+              "finding_id": "open_question:2",
+              "action": "remove_open_question",
+              "node_id": null,
+              "decision": null,
+              "agent_id": null,
+              "agent_name": null,
+              "catalog_score": null,
+              "gateway_label": null,
+              "question_text": "What citation granularity is required for database answers versus document passages?",
+              "edge_from": null,
+              "edge_to": null
+            },
+            {
+              "id": "keep_question",
+              "label": "Keep tracking this question",
+              "description": "Leave open; acknowledge you are aware.",
+              "finding_id": "open_question:2",
+              "action": "acknowledge",
+              "node_id": null,
+              "decision": null,
+              "agent_id": null,
+              "agent_name": null,
+              "catalog_score": null,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            }
+          ],
+          "resolved": false,
+          "resolution": null
+        },
+        {
+          "level": "warn",
+          "code": "open_question",
+          "message": "Should conflict flags include confidence scores or only qualitative explanations?",
+          "node_id": null,
+          "finding_id": "open_question:3",
+          "finding_key": "open_question:3",
+          "blocks_approval": false,
+          "help_text": "Resolve or acknowledge open planning questions.",
+          "remediations": [
+            {
+              "id": "resolve_question",
+              "label": "Mark question resolved",
+              "description": "Remove this open question from the plan.",
+              "finding_id": "open_question:3",
+              "action": "remove_open_question",
+              "node_id": null,
+              "decision": null,
+              "agent_id": null,
+              "agent_name": null,
+              "catalog_score": null,
+              "gateway_label": null,
+              "question_text": "Should conflict flags include confidence scores or only qualitative explanations?",
+              "edge_from": null,
+              "edge_to": null
+            },
+            {
+              "id": "keep_question",
+              "label": "Keep tracking this question",
+              "description": "Leave open; acknowledge you are aware.",
+              "finding_id": "open_question:3",
+              "action": "acknowledge",
+              "node_id": null,
+              "decision": null,
+              "agent_id": null,
+              "agent_name": null,
+              "catalog_score": null,
+              "gateway_label": null,
+              "question_text": null,
+              "edge_from": null,
+              "edge_to": null
+            }
+          ],
+          "resolved": false,
+          "resolution": null
+        },
+        {
+          "level": "pass",
+          "code": "validation_scope",
+          "message": "Automated checks cover structure, catalog ids, and spec overlap \u2014 not full business proof.",
+          "node_id": null,
+          "finding_id": "validation_scope:_",
+          "finding_key": "validation_scope:_",
+          "blocks_approval": false,
+          "help_text": "",
+          "remediations": [],
+          "resolved": false,
+          "resolution": null
+        }
+      ],
+      "node_status": {
+        "analyst-chat-intake": "pass",
+        "intent-routing-agent": "warn",
+        "nl-to-sql-execution": "pass",
+        "db-result-reconciliation-gateway": "pass",
+        "document-context-retrieval": "warn",
+        "semantic-rag-support": "warn",
+        "answer-consolidation": "warn",
+        "answer-rewriter": "warn",
+        "chat-response-delivery": "pass"
+      }
+    },
+    "validation_resolutions": {},
+    "architecture_approved": false,
+    "node_explanations": {
+      "analyst-chat-intake": {
+        "purpose": "Capture the internal analyst's lookup question and conversation context at the chatbot entrypoint.",
+        "role_in_workflow": "This is the starting point of the workflow where the analyst submits a natural-language record lookup request. It packages the question, session state, and any conversational context so downstream routing and retrieval steps can process the request consistently.",
+        "why_it_exists": "This step is built because the workflow needs an application-specific chat intake layer, and there is no cataloged agent for UI/session capture. It also cleanly separates channel handling from the reasoning and retrieval pipeline behind it.",
+        "consumes_from": [
+          "Internal analyst question",
+          "Chat session context"
+        ],
+        "feeds_into": [
+          "Intent Routing Agent"
+        ],
+        "chat_relationship": "The user asked for a chatbot for internal analysts, so this node is the front door where those analysts ask their record lookup questions.",
+        "execution_summary": "Receives the analyst's question and session context and forwards it into the workflow."
+      },
+      "intent-routing-agent": {
+        "purpose": "Decide whether the question can be answered from live databases alone or may need supporting document context.",
+        "role_in_workflow": "After intake, this step classifies the lookup request and attaches routing metadata for the rest of the pipeline. It preserves the SQL-first design by steering every request into live database lookup while identifying cases that may later require document support.",
+        "why_it_exists": "This node adapts the existing Pipeline Intent Classifier because it already performs question routing and only needs retuning for database-only versus database-plus-document decisions. The user explicitly accepted the advised pattern of SQL first with document fallback, so a routing layer is necessary to operationalize that behavior.",
+        "consumes_from": [
+          "Analyst Chat Intake",
+          "user question"
+        ],
+        "feeds_into": [
+          "NL to SQL Execution",
+          "intent and routing metadata"
+        ],
+        "chat_relationship": "This directly reflects the conversation where the user agreed to use live databases first and only fall back to documents when the database answer is missing, ambiguous, or needs explanation.",
+        "execution_summary": "Classifies the analyst's question and tags it for SQL-first handling with optional document fallback."
+      },
+      "nl-to-sql-execution": {
+        "purpose": "Translate the analyst's natural-language lookup into SQL and run it against live enterprise databases.",
+        "role_in_workflow": "This is the primary retrieval step because the requested system is database-first for record lookups. It turns the analyst's question into executable queries, runs them on live systems, and returns current record-level results for reconciliation.",
+        "why_it_exists": "This node is built rather than reused because live enterprise SQL generation and execution is a core requirement and no catalog match directly covers it. The user specifically said to use live databases, so this step is essential to satisfy that requirement instead of relying on indexed copies.",
+        "consumes_from": [
+          "Intent Routing Agent",
+          "intent and routing metadata"
+        ],
+        "feeds_into": [
+          "DB Result Reconciliation Gateway",
+          "live database results"
+        ],
+        "chat_relationship": "The user said analysts mostly need record lookups and explicitly chose live databases, so this step is the main mechanism for producing those answers from source systems.",
+        "execution_summary": "Generates SQL from the question, executes it on live databases, and returns the resulting records."
+      },
+      "db-result-reconciliation-gateway": {
+        "purpose": "Evaluate database results for completeness and confidence, enforce database-first truth, and decide whether document support is needed.",
+        "role_in_workflow": "This gateway sits between raw SQL output and final answer generation. It checks whether the live database answer is sufficient, whether only partial results can be shown, and whether ambiguity, missing fields, or explanatory needs should trigger document retrieval.",
+        "why_it_exists": "This step is built as bespoke control logic because the user required several policy decisions that need explicit enforcement: database wins, partial results should be shown, and conflicts with documents should be flagged. A dedicated gateway makes those trust and branching rules transparent rather than burying them inside a generic answering agent.",
+        "consumes_from": [
+          "NL to SQL Execution",
+          "live database results"
+        ],
+        "feeds_into": [
+          "Document Context Retrieval",
+          "Answer Consolidation",
+          "needs explanation, ambiguity handling, or missing fields",
+          "database-first reconciled results and conflict status"
+        ],
+        "chat_relationship": "This node implements the user's choices that database rows are the source of truth, partial results are acceptable, and stale or conflicting document evidence should be surfaced rather than override the database.",
+        "execution_summary": "Assesses SQL results, preserves database-first truth, and routes either directly to answering or to document support when needed."
+      },
+      "document-context-retrieval": {
+        "purpose": "Retrieve relevant enterprise document evidence when the database answer is incomplete, ambiguous, or needs supporting explanation.",
+        "role_in_workflow": "This step is only invoked after the gateway determines that SQL alone is not enough. It searches enterprise repositories for policy, narrative, or supporting passages that can explain or supplement the database answer without replacing database truth.",
+        "why_it_exists": "This node adapts the GraphRAG Index & Query Agent because it is a close fit for enterprise document retrieval and can be generalized beyond its original KYC domain. It exists because the user wanted answers across structured databases and enterprise documents, but only as document support when SQL is insufficient.",
+        "consumes_from": [
+          "DB Result Reconciliation Gateway",
+          "needs explanation, ambiguity handling, or missing fields"
+        ],
+        "feeds_into": [
+          "Semantic RAG Support",
+          "candidate document context"
+        ],
+        "chat_relationship": "The user asked for a chatbot that works across databases and enterprise documents, and accepted the recommendation to search documents only when the database answer is missing, ambiguous, or needs explanation.",
+        "execution_summary": "Searches enterprise documents for supporting context when the SQL answer alone is not enough."
+      },
+      "semantic-rag-support": {
+        "purpose": "Improve document support quality by semantically ranking and refining the retrieved passages and citations.",
+        "role_in_workflow": "This step takes candidate document context and performs deeper semantic retrieval so the answering layer receives the most relevant supporting passages. It strengthens coverage and citation quality before the final answer is assembled.",
+        "why_it_exists": "This node adapts the Eryl Semantic RAG Agent Chain because it already performs semantic retrieval over unstructured documents and can be repurposed for enterprise repositories. It is included to improve the quality of supporting context without changing the database-first decision policy.",
+        "consumes_from": [
+          "Document Context Retrieval",
+          "candidate document context"
+        ],
+        "feeds_into": [
+          "Answer Consolidation",
+          "ranked supporting passages and citations"
+        ],
+        "chat_relationship": "Because the user wanted answers with citations from enterprise documents when needed, this step helps ensure the supporting document evidence is relevant and citeable.",
+        "execution_summary": "Ranks and refines document evidence into high-quality supporting passages with citations."
+      },
+      "answer-consolidation": {
+        "purpose": "Merge reconciled database results and any supporting document evidence into one cited answer with conflict and partial-result handling.",
+        "role_in_workflow": "This is the synthesis point where structured truth from SQL and contextual evidence from documents are combined into a single draft response. It carries forward database-first precedence, includes citations, notes partial answers when joins or coverage are incomplete, and flags disagreements between sources.",
+        "why_it_exists": "This node adapts the Final Answer Consolidation Agent because it already combines multiple analytical outputs into one response and can be extended for SQL-plus-document workflows. It exists to enforce the user's requested answer behavior in one place: cited responses, database wins, partial results shown, and conflicts surfaced.",
+        "consumes_from": [
+          "DB Result Reconciliation Gateway",
+          "database-first reconciled results and conflict status",
+          "Semantic RAG Support",
+          "ranked supporting passages and citations"
+        ],
+        "feeds_into": [
+          "Answer Rewriter",
+          "draft cited answer"
+        ],
+        "chat_relationship": "This directly addresses the user's requirements to answer with citations, treat the database as the source of truth, show partial results when reconciliation is messy, and flag conflicts when documents appear newer or inconsistent.",
+        "execution_summary": "Combines database truth and document support into a single cited draft answer with conflict and partial-result notes."
+      },
+      "answer-rewriter": {
+        "purpose": "Convert the consolidated draft into concise analyst-facing language without changing the underlying facts.",
+        "role_in_workflow": "After the answer is assembled, this step improves readability and presentation for the analyst. It preserves citations, conflict flags, and partial-result notes while making the response easier to consume in chat.",
+        "why_it_exists": "This node is reused directly because the Final Answer Rewriter already fits the need to post-process combined answers into clean user-facing text without introducing new facts. Reusing it reduces implementation effort while keeping factual control in the prior consolidation step.",
+        "consumes_from": [
+          "Answer Consolidation",
+          "draft cited answer"
+        ],
+        "feeds_into": [
+          "Chat Response Delivery",
+          "final user-facing response"
+        ],
+        "chat_relationship": "The user wants a practical chatbot response for internal analysts, so this step ensures the final answer is concise and usable while retaining the citations and conflict transparency they requested.",
+        "execution_summary": "Rewrites the consolidated answer into clear analyst-facing language while preserving facts and citations."
+      },
+      "chat-response-delivery": {
+        "purpose": "Return the final cited response, including any conflict flags and partial-result notes, back to the analyst in the chat interface.",
+        "role_in_workflow": "This is the final delivery step that sends the completed answer from the backend workflow to the analyst-facing chatbot. It ensures the user receives the response in the expected conversational channel with all supporting annotations intact.",
+        "why_it_exists": "This step is built because response delivery is an application integration concern rather than a reusable cataloged agent capability. It cleanly separates answer generation from channel-specific rendering and transport.",
+        "consumes_from": [
+          "Answer Rewriter",
+          "final user-facing response"
+        ],
+        "feeds_into": [
+          "Internal analyst chat interface"
+        ],
+        "chat_relationship": "The user asked for a chatbot for internal analysts, and this node is what actually returns the final answer with citations, conflict flags, and partial-result handling into that chat experience.",
+        "execution_summary": "Delivers the final cited chatbot response back to the analyst."
+      }
+    }
+  },
+  "nodePositions": {}
+}
