@@ -1,0 +1,19 @@
+{
+  "id": "nl-to-sql-execution",
+  "label": "NL to SQL Execution",
+  "agentId": null,
+  "description": "Generates SQL from the question, executes it on live databases, and returns the resulting records.",
+  "inputs": [
+    "mode",
+    "run_vision_pipeline",
+    "reason",
+    "shelf_comparison_sql_route"
+  ],
+  "outputs": [
+    "Processed result from: mode",
+    "Processed result from: run_vision_pipeline",
+    "Processed result from: reason",
+    "Processed result from: shelf_comparison_sql_route"
+  ],
+  "status": "scaffold"
+}
