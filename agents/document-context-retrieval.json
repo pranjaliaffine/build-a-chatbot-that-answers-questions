@@ -1,0 +1,19 @@
+{
+  "id": "document-context-retrieval",
+  "label": "Document Context Retrieval",
+  "agentId": "graphrag-index-query-agent",
+  "description": "Searches enterprise documents for supporting context when the SQL answer alone is not enough.",
+  "inputs": [
+    "project_id",
+    "TXT documents in projects/{id}/input/",
+    "natural language question",
+    "search method (local/global/drift/basic)"
+  ],
+  "outputs": [
+    "entities.parquet",
+    "community_reports.parquet",
+    "LanceDB embeddings",
+    "natural language answer text"
+  ],
+  "status": "scaffold"
+}
