@@ -1,0 +1,17 @@
+{
+  "id": "db-result-reconciliation-gateway",
+  "label": "DB Result Reconciliation Gateway",
+  "agentId": null,
+  "description": "Assesses SQL results, preserves database-first truth, and routes either directly to answering or to document support when needed.",
+  "inputs": [
+    "Processed result from: mode",
+    "Processed result from: run_vision_pipeline",
+    "Processed result from: reason",
+    "Processed result from: shelf_comparison_sql_route"
+  ],
+  "outputs": [
+    "Workflow trigger payload",
+    "Routed items to downstream steps"
+  ],
+  "status": "scaffold"
+}
