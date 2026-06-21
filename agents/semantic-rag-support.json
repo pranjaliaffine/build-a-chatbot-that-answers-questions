@@ -1,0 +1,15 @@
+{
+  "id": "semantic-rag-support",
+  "label": "Semantic RAG Support",
+  "agentId": "eryl-semantic-rag-agent-chain",
+  "description": "Ranks and refines document evidence into high-quality supporting passages with citations.",
+  "inputs": [
+    "semantic_question",
+    "Vector_Data routing hints"
+  ],
+  "outputs": [
+    "retrieval-grounded answer",
+    "Semantic-based analysis_type"
+  ],
+  "status": "scaffold"
+}
