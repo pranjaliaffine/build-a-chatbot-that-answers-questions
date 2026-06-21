@@ -1,0 +1,13 @@
+{
+  "id": "chat-response-delivery",
+  "label": "Chat Response Delivery",
+  "agentId": null,
+  "description": "Delivers the final cited chatbot response back to the analyst.",
+  "inputs": [
+    "final_answer_text"
+  ],
+  "outputs": [
+    "Processed result from: final_answer_text"
+  ],
+  "status": "scaffold"
+}
