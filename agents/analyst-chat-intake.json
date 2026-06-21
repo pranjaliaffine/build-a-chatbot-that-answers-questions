@@ -1,0 +1,13 @@
+{
+  "id": "analyst-chat-intake",
+  "label": "Analyst Chat Intake",
+  "agentId": null,
+  "description": "Receives the analyst's question and session context and forwards it into the workflow.",
+  "inputs": [
+    "Workflow entry (user request or trigger)"
+  ],
+  "outputs": [
+    "Processed result from: Workflow entry (user request or trigger)"
+  ],
+  "status": "scaffold"
+}
